@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>خواننده OPML با سطوح رنگی و بازشوندگی</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+        body {
+            background: #f4f7fb;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .card {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px -12px rgba(0,20,40,0.25);
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+        .header {
+            background: linear-gradient(138deg, #1e2b4f 0%, #14233c 100%);
+            color: white;
+            padding: 28px 32px;
+        }
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-weight: 500;
+            font-size: 1.9rem;
+            letter-spacing: -0.3px;
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.7;
+            font-weight: 300;
+        }
+        .toolbar {
+            padding: 24px 32px 16px 32px;
+            background: #ffffff;
+            border-bottom: 1px solid #e9ecf2;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+        .file-zone {
+            display: flex;
+            flex: 2 1 300px;
+            gap: 12px;
+            align-items: center;
+        }
+        .file-label {
+            background: #edf2f7;
+            color: #1e2b4f;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.15s;
+            white-space: nowrap;
+            border: 1px solid #cbd5e1;
+        }
+        .file-label:hover {
+            background: #dfe8f2;
+        }
+        .file-label input {
+            position: absolute;
+            opacity: 0;
+            width: 0.1px;
+            height: 0.1px;
+        }
+        .file-name {
+            color: #2d3a5e;
+            font-size: 0.9rem;
+            background: #f8fafd;
+            padding: 8px 16px;
+            border-radius: 40px;
+            border: 1px dashed #a0b8d4;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .sample-btn {
+            background: transparent;
+            border: 1px solid #a3b8d4;
+            color: #1e2b4f;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.15s;
+            white-space: nowrap;
+        }
+        .sample-btn:hover {
+            background: #e5ebf5;
+            border-color: #7a95b8;
+        }
+        .output-container {
+            padding: 20px 24px 32px 32px;
+            background: #ffffff;
+            max-height: 500px;
+            overflow: auto;
+        }
+        /* ساختار درختی */
+        #output {
+            margin: 0;
+            padding: 0;
+        }
+        #output ul {
+            list-style: none;
+            padding-right: 24px;   /* rtl padding-right = indent */
+            margin: 4px 0;
+        }
+        #output > ul {
+            padding-right: 0;       /* ریشه بدون تورفتگی */
+            display: block;
+        }
+        /* همه زیرشاخه‌ها ابتدا بسته باشند */
+        #output ul ul {
+            display: none;
+        }
+        #output li {
+            margin: 6px 0;
+            line-height: 1.6;
+        }
+        .title {
+            cursor: pointer;
+            display: inline-block;
+            padding: 6px 12px 6px 20px;
+            border-radius: 30px;
+            transition: background 0.1s;
+            font-weight: 450;
+            max-width: 100%;
+            word-break: break-word;
+        }
+        .title:hover {
+            background: #eef3fc;
+        }
+        /* رنگ‌بندی سطوح */
+        .level-0 {
+            color: #0b2d4b;
+            font-weight: 600;
+            background: #e3f0ff;
+            padding: 6px 16px;
+            border-right: 5px solid #0b2d4b;
+        }
+        .level-1 {
+            color: #1c531c;
+            font-weight: 500;
+            background: #e5f7e5;
+            border-right: 4px solid #2b7a2b;
+        }
+        .level-2 {
+            color: #b45b0a;
+            font-weight: 500;
+            background: #fff0dc;
+            border-right: 4px solid #c96f0f;
+        }
+        .level-3 {
+            color: #6a1b9a;
+            font-weight: 450;
+            background: #f3e5ff;
+            border-right: 4px solid #8e44ad;
+        }
+        .level-4 {
+            color: #0f6f6f;
+            font-weight: 450;
+            background: #d9f2f2;
+            border-right: 4px solid #1d7e7e;
+        }
+        .level-5, .level-6, .level-7 {
+            color: #4b5563;
+            font-weight: 400;
+            background: #f0f2f5;
+            border-right: 4px solid #6b7280;
+        }
+        /* پیام placeholder */
+        .empty-message {
+            color: #808a9c;
+            text-align: center;
+            padding: 40px 20px;
+            background: #fafcff;
+            border-radius: 40px;
+            font-size: 1.1rem;
+        }
+        .footer-note {
+            font-size: 0.8rem;
+            color: #7f8a9e;
+            padding: 12px 32px 24px 32px;
+            border-top: 1px solid #e9ecf2;
+            background: #fbfdff;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="header">
+        <h1>📂 خواننده OPML با سطوح رنگی</h1>
+        <p>تیترهای H1 تا H3 با رنگ اختصاصی – با کلیک باز و بسته می‌شوند (سطوح عمیق‌تر هم رنگ مخصوص خود را دارند)</p>
+    </div>
+
+    <div class="toolbar">
+        <div class="file-zone">
+            <label class="file-label">
+                📁 انتخاب فایل OPML
+                <input type="file" id="fileInput" accept=".opml,.xml,text/xml">
+            </label>
+            <span class="file-name" id="fileName">هیچ فایلی انتخاب نشده</span>
+        </div>
+        <button class="sample-btn" id="loadSample">🔍 بارگذاری نمونه</button>
+    </div>
+
+    <div class="output-container">
+        <div id="output">
+            <div class="empty-message">
+                ⬆️ یک فایل OPML انتخاب کنید یا روی "نمونه" کلیک کنید.
+            </div>
+        </div>
+    </div>
+    <div class="footer-note">
+        ⚡ کلیک روی هر تیتر (H1 ،H2 ،H3 و ...) زیرمجموعه‌های مستقیم آن را باز/بسته می‌کند.
+    </div>
+</div>
+
+<script>
+    (function() {
+        // المان‌های DOM
+        const fileInput = document.getElementById('fileInput');
+        const fileNameSpan = document.getElementById('fileName');
+        const outputDiv = document.getElementById('output');
+        const sampleBtn = document.getElementById('loadSample');
+
+        // نمونه OPML آماده برای تست
+        const sampleOpml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+    <head>
+        <title>فهرست نمونه</title>
+    </head>
+    <body>
+        <outline text="📌 سفرنامه نویسی (H1)">
+            <outline text="✈️ مقصدهای داخلی (H2)">
+                <outline text="اصفهان – میدان نقش جهان (H3)"/>
+                <outline text="شیراز – حافظیه (H3)"/>
+                <outline text="یزد – بافت تاریخی (H3)"/>
+            </outline>
+            <outline text="🌍 سفرهای خارجی (H2)">
+                <outline text="ترکیه – استانبول (H3)">
+                    <outline text="بازار بزرگ (H4)"/>
+                    <outline text="ایاصوفیه (H4)"/>
+                </outline>
+                <outline text="ارمنستان – ایروان (H3)"/>
+            </outline>
+        </outline>
+        <outline text="📚 لیست کتاب‌های صوتی (H1)">
+            <outline text="توسعه فردی (H2)">
+                <outline text="اثر مرکب (H3)"/>
+                <outline text="عادت‌های اتمی (H3)"/>
+            </outline>
+            <outline text="داستانی (H2)">
+                <outline text="صد سال تنهایی (H3)"/>
+                <outline text="1984 (H3)"/>
+            </outline>
+        </outline>
+        <outline text="🔗 پیوندهای مفید (H1) بدون زیرمجموعه"/>
+    </body>
+</opml>`;
+
+        // تابع برای پاک کردن و نمایش placeholder
+        function showPlaceholder(message) {
+            outputDiv.innerHTML = `<div class="empty-message">${message}</div>`;
+        }
+
+        // تابع بازگشتی برای ساخت درخت از گره‌های outline
+        function buildTreeFromOutline(nodes, depth = 0) {
+            const ul = document.createElement('ul');
+            for (let node of nodes) {
+                // اطمینان از اینکه المان outline است
+                if (node.nodeType === 1 && node.tagName.toLowerCase() === 'outline') {
+                    const li = document.createElement('li');
+                    
+                    // ساخت عنوان
+                    const titleDiv = document.createElement('div');
+                    titleDiv.className = `title level-${Math.min(depth, 5)}`; // سطوح بیشتر از 5 هم کلاس سطح 5 می‌گیرند
+                    
+                    // دریافت متن از attributeهای 'text' یا 'title'
+                    let text = node.getAttribute('text') || node.getAttribute('title') || 'بدون عنوان';
+                    titleDiv.textContent = text;
+                    
+                    li.appendChild(titleDiv);
+                    
+                    // پردازش فرزندان (outline‌های تو در تو)
+                    const childOutlines = [];
+                    for (let child of node.children) {
+                        if (child.tagName.toLowerCase() === 'outline') {
+                            childOutlines.push(child);
+                        }
+                    }
+                    
+                    if (childOutlines.length > 0) {
+                        const childUl = buildTreeFromOutline(childOutlines, depth + 1);
+                        li.appendChild(childUl);
+                    }
+                    
+                    ul.appendChild(li);
+                }
+            }
+            return ul;
+        }
+
+        // تابع اصلی پردازش سند XML
+        function processOpmlDocument(xmlString) {
+            try {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+                
+                // بررسی خطای parsing (مثلاً اگر xml معتبر نباشد)
+                const parseError = xmlDoc.getElementsByTagName("parsererror");
+                if (parseError.length > 0) {
+                    showPlaceholder("❌ فایل XML معتبر نیست. لطفاً یک فایل OPML انتخاب کنید.");
+                    return;
+                }
+
+                // یافتن body
+                const body = xmlDoc.querySelector('body');
+                if (!body) {
+                    showPlaceholder("⚠️ ساختار OPML معتبر نیست: تگ <body> یافت نشد.");
+                    return;
+                }
+
+                // جمع‌آوری outlineهای سطح اول (زیر body)
+                const topLevelOutlines = [];
+                for (let child of body.children) {
+                    if (child.tagName.toLowerCase() === 'outline') {
+                        topLevelOutlines.push(child);
+                    }
+                }
+
+                if (topLevelOutlines.length === 0) {
+                    showPlaceholder("📭 هیچ outline ای در این فایل یافت نشد.");
+                    return;
+                }
+
+                // ساخت درخت از سطح اول با عمق 0
+                const rootUl = buildTreeFromOutline(topLevelOutlines, 0);
+                
+                // پاک کردن خروجی قبلی و قرار دادن درخت جدید
+                outputDiv.innerHTML = '';
+                outputDiv.appendChild(rootUl);
+
+                // افزودن eventListener به همه titleها برای toggle زیرشاخه
+                const titles = outputDiv.querySelectorAll('.title');
+                titles.forEach(title => {
+                    title.addEventListener('click', function(e) {
+                        // پیدا کردن ul خواهر (بعد از این عنوان)
+                        const nextUl = this.nextElementSibling;
+                        if (nextUl && nextUl.tagName === 'UL') {
+                            // تغییر نمایش: اگر display none است یا computed می‌گوید none → block ، در غیر این صورت none
+                            if (window.getComputedStyle(nextUl).display === 'none') {
+                                nextUl.style.display = 'block';
+                            } else {
+                                nextUl.style.display = 'none';
+                            }
+                        }
+                        // جلوگیری از propagation به والد (اختیاری ولی مفید)
+                        e.stopPropagation();
+                    });
+                });
+
+            } catch (error) {
+                console.error(error);
+                showPlaceholder("❗ خطایی در پردازش فایل رخ داد: " + error.message);
+            }
+        }
+
+        // مدیریت انتخاب فایل
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                fileNameSpan.textContent = 'هیچ فایلی انتخاب نشده';
+                showPlaceholder('⬆️ یک فایل OPML انتخاب کنید.');
+                return;
+            }
+
+            fileNameSpan.textContent = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(loadEvent) {
+                const content = loadEvent.target.result;
+                processOpmlDocument(content);
+            };
+            reader.onerror = function() {
+                showPlaceholder('❌ خطا در خواندن فایل.');
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+
+        // بارگذاری نمونه
+        sampleBtn.addEventListener('click', function() {
+            fileNameSpan.textContent = 'نمونه داخلی';
+            processOpmlDocument(sampleOpml);
+        });
+
+        // نمایش اولیه (همان placeholder)
+        // (همینطور که هست می‌ماند)
+    })();
+</script>
+</body>
+</html>
